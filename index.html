@@ -4820,16 +4820,115 @@ function setupCenterBoatButton(){
   });
 }
 
-// ---- SERVICE WORKER ----
-// Register sw.js for offline play. Only registers when served over HTTP/S
-// (not file://), so opening the file directly during local testing doesn't
-// trip an error. Silent on failure — the game works fine without offline.
+// ---- SERVICE WORKER + AUTO-UPDATE ----
+//
+// v17.3.14-3: smart update flow. The friend-facing problem we solve here:
+// if a deploy ever ships a buggy HTML, the SW caches it and friends are
+// stuck with a broken game until they clear their browser data — which
+// they will not do. So:
+//
+//   1. The HTML has a BUILD_ID baked in (just a date+counter string).
+//      Every deploy bumps it.
+//   2. On load, the page asks the active SW "what build are you serving?"
+//      via postMessage. The SW reads BUILD_ID from the cached HTML and
+//      replies.
+//   3. If the live page's BUILD_ID doesn't match what the SW reports, OR
+//      the SW reports nothing (first install), we tell the SW to clear
+//      caches and reload — but only after waiting 1.5s of successful page
+//      load, so a partial network failure mid-page doesn't trigger a loop.
+//   4. The page also listens for `controllerchange` from the SW. When the
+//      SW activates a new version, we reload automatically so the user
+//      gets the new HTML without any action.
+//
+// In normal usage: friend opens the game, the SW (if any) tries to serve
+// from cache, the new HTML loads (network-first now), and everything works.
+// If the cached HTML *was* serving (e.g. they're offline-on-resume), the
+// version-mismatch check fires the cache-bust and reload.
+//
+// Final safety: a "/sw-kill" URL still exists in the SW as a manual
+// nuclear option, but friends never need to know about it.
+
+const BUILD_ID = '17.3.14-3-2026-05-18';  // bump this every deploy
+
 if('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((err) => {
-      console.warn('[SW] register failed', err);
+  // Register the SW. We don't wait for `load` — register as early as
+  // possible so the auto-update messaging is set up before the user
+  // does anything.
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    // Listen for "a new SW has taken over" — happens automatically when
+    // we deploy a new sw.js with skipWaiting. Reload to pick up the
+    // new HTML. Guard against reload loops with a sessionStorage flag.
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if(refreshing) return;
+      refreshing = true;
+      // Tiny visual cue so the user sees something is happening
+      showUpdateToast('Updating to latest version…');
+      setTimeout(() => location.reload(), 600);
     });
+
+    // When the registration has a waiting worker (a new SW downloaded
+    // but hasn't activated because old tabs are open), tell it to
+    // activate. The new SW handles skipWaiting on this message.
+    if(reg.waiting){
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if(!nw) return;
+      nw.addEventListener('statechange', () => {
+        if(nw.state === 'installed' && navigator.serviceWorker.controller){
+          // A new version is ready. Activate it right away.
+          nw.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    });
+
+    // Version-mismatch check: ask the SW what BUILD_ID it has cached
+    // in its index.html. If it doesn't match this page's BUILD_ID, the
+    // SW is serving stale HTML — clear caches and reload.
+    setTimeout(() => {
+      if(!navigator.serviceWorker.controller) return; // no SW serving yet
+      const channel = new MessageChannel();
+      channel.port1.onmessage = (ev) => {
+        const cachedBuild = ev.data && ev.data.buildId;
+        if(cachedBuild && cachedBuild !== BUILD_ID){
+          console.warn('[Update] Build mismatch:', cachedBuild, '→', BUILD_ID);
+          // Don't reload-loop: only bust if we haven't already this session
+          if(!sessionStorage.getItem('vs_just_busted')){
+            sessionStorage.setItem('vs_just_busted', '1');
+            showUpdateToast('Updating to latest version…');
+            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+            setTimeout(() => location.reload(), 800);
+          }
+        } else {
+          // Build matches — clear the just-busted flag so future legit
+          // version mismatches can fire.
+          sessionStorage.removeItem('vs_just_busted');
+        }
+      };
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'GET_BUILD_ID' }, [channel.port2]
+      );
+    }, 1500); // delay so page load completes first
+  }).catch((err) => {
+    console.warn('[SW] register failed', err);
   });
+
+  // Friend-facing update toast — a small pill at the top so they see
+  // *something* during an auto-update reload, not a blank flash.
+  function showUpdateToast(msg){
+    if(document.getElementById('vs-update-toast')) return;
+    const t = document.createElement('div');
+    t.id = 'vs-update-toast';
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);'
+      + 'background:rgba(8,20,12,0.95);border:1px solid rgba(201,162,39,0.5);'
+      + 'border-radius:20px;padding:8px 18px;color:#e8c547;font-family:Cabin,sans-serif;'
+      + 'font-size:12px;letter-spacing:1.5px;text-transform:uppercase;'
+      + 'z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,0.5);';
+    document.body.appendChild(t);
+  }
 }
 
 // ---- SOUND TOGGLE ----
