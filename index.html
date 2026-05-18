@@ -2498,26 +2498,38 @@ function isOnLand(lat,lng){
 // LEAFLET MAP
 // ================================================================
 function initLeafletMap(){
-  // v17.3.14: on touch devices, enable pinch-zoom and drag-pan so the
-  // player can frame the lake however they like. The joystick has its
-  // own pointer-events:auto and sits above the map, so finger drags
-  // *on the joystick* go to it; drags anywhere else go to the map.
-  // touchZoom is left on (Leaflet default), and tap delay disabled to
-  // play well with our touch button overlays.
+  // v17.3.14b: wrapped in try/catch — if any Leaflet option ever breaks
+  // map init on a particular device, we log it and keep the game running
+  // with no map (the boat still moves, the player just can't see the
+  // lake). Better than a blank screen.
+  try {
+    initLeafletMapInner();
+  } catch(e){
+    console.error('[Map] Leaflet init failed:', e);
+    // Display a fallback message so the user isn't staring at a black
+    // screen with no idea what happened.
+    const el = document.getElementById('map-leaflet');
+    if(el){
+      el.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#a8d4a8;text-align:center;padding:32px;font-family:Cabin,sans-serif">'
+        + '<div style="font-size:48px;margin-bottom:12px">🗺️</div>'
+        + '<div style="font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#c9a227;margin-bottom:8px">Map Unavailable</div>'
+        + '<div style="font-size:12px;color:#8bbf8b;max-width:280px;line-height:1.5">The lake map couldn\'t load. You can still drop anchor and fish — tap the Anchor button.</div>'
+        + '</div>';
+    }
+  }
+}
+
+function initLeafletMapInner(){
+  // v17.3.14b: changed only the dragging option vs. the working v17.3.13 config.
+  // touchZoom is Leaflet's default-true, so pinch-zoom comes for free.
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   leafMap=L.map('map-leaflet',{
     center:[47.900,-92.390],zoom:13,
     zoomControl:false,attributionControl:false,
     dragging: isTouch,           // touch: drag-pan; desktop: keep arrow-key boat control
-    scrollWheelZoom: true,
-    touchZoom: true,             // pinch zoom (default true, explicit for clarity)
+    scrollWheelZoom:true,
     doubleClickZoom:false,
     keyboard:false,
-    tap:true,                    // good touch interaction with Leaflet
-    bounceAtZoomLimits:false,
-    maxBoundsViscosity:0.0,
-    minZoom: 11,
-    maxZoom: 18,
   });
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     {maxZoom:18}).addTo(leafMap);
@@ -2633,7 +2645,8 @@ function updateBoat(){
   }
 
   const pos=L.latLng(b.lat,b.lng);
-  boatMarker.setLatLng(pos);
+  // v17.3.14b: guard against leafMap/boatMarker being null if init failed.
+  if(boatMarker) boatMarker.setLatLng(pos);
 
   // Rotate boat so bow (top of SVG) points in direction of travel
   // angle=0 → heading north (up on map). Leaflet north = up.
@@ -2645,7 +2658,7 @@ function updateBoat(){
   // v17.3.14: only auto-follow the boat when the user hasn't manually
   // panned away. If they have, leave the view alone — there's a
   // "Center on Boat" button they can hit to resume following.
-  if(window._followBoat !== false){
+  if(leafMap && window._followBoat !== false){
     leafMap.panTo(pos,{animate:true,duration:0.1,easeLinearity:1,noMoveStart:true});
   }
   checkHotspotProximity();
@@ -5232,7 +5245,12 @@ function launchGame(){
   document.getElementById('zoom-controls').style.display='flex';
   document.getElementById('instructions').textContent='↑↓ Throttle · ←→ Steer · Scroll=Zoom · D = Drop Anchor & Fish';
   if(!leafMap) initLeafletMap();
-  else{document.getElementById('map-leaflet').style.display='block';leafMap.invalidateSize();}
+  else{
+    document.getElementById('map-leaflet').style.display='block';
+    // v17.3.14b: invalidateSize can throw if leafMap wasn't fully initialized
+    // (e.g. init succeeded but a later step failed). Guard it.
+    try { leafMap.invalidateSize(); } catch(e){ console.warn('[Map] invalidateSize:', e); }
+  }
   startAmbient();
   requestAnimationFrame(gameLoop);
 }
