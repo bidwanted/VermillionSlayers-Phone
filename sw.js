@@ -8,7 +8,7 @@
 // Bump CACHE_VERSION whenever index.html changes — old caches get cleaned up
 // on the next activation.
 
-const CACHE_VERSION = 'vs-v17.3.13-1';
+const CACHE_VERSION = 'vs-v17.3.14-1';
 const CORE_CACHE = `${CACHE_VERSION}-core`;
 const TILE_CACHE = `${CACHE_VERSION}-tiles`;
 

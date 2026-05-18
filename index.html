@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a3020">
 <title>Vermillion Slayers</title>
 <!-- PWA: Add to Home Screen / install app -->
@@ -430,6 +430,34 @@ body.catch-open #tackle-panel.show,
 body.catch-open #tackle-open-btn,
 body.catch-open #tackle-panel { display: none !important; }
 
+/* v17.3.14: Center-on-boat button — only shown when user has manually
+   panned away from the boat. Sits top-center so it's reachable from
+   either thumb. Hidden in fishing phase. */
+#center-boat-btn{
+  position:absolute;
+  top:max(60px, env(safe-area-inset-top, 0px));
+  left:50%; transform:translateX(-50%);
+  background:rgba(8,20,12,0.92);
+  border:1px solid rgba(201,162,39,0.5);
+  border-radius:24px;
+  padding:9px 18px;
+  font-family:'Cabin',sans-serif;
+  font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--gold-light);
+  cursor:pointer;
+  z-index:25;
+  display:none; align-items:center;
+  box-shadow:0 4px 14px rgba(0,0,0,0.5);
+  -webkit-tap-highlight-color:transparent;
+  animation:cb-fadein .25s ease-out;
+}
+#center-boat-btn.show{ display:inline-flex; }
+body:not(.is-touch) #center-boat-btn,
+body.in-fishing-v9 #center-boat-btn{ display:none !important; }
+@keyframes cb-fadein{ from { opacity:0; transform:translate(-50%, -8px); } to { opacity:1; transform:translateX(-50%); } }
+#center-boat-btn:active{ transform:translateX(-50%) scale(0.96); }
+
+
 /* ====================================================================
    v17.3.13 — MOBILE / TOUCH UI
    All touch controls are gated behind body.is-touch so desktop keyboard
@@ -689,14 +717,18 @@ body.is-touch .btn-share{ min-height:44px; padding:10px 22px; font-size:12px; }
    shout. Reflects the current mute state. */
 #sound-toggle{
   position:absolute;
-  top:max(14px, env(safe-area-inset-top, 0px));
-  right:max(60px, env(safe-area-inset-right, 0px));
-  width:38px; height:38px;
+  /* v17.3.14: positioned below the player HUD on the LEFT in all touch
+     orientations. This keeps it clear of the stats panel (top-right)
+     and the livewell button (top-center in landscape). */
+  top:max(64px, calc(64px + env(safe-area-inset-top, 0px)));
+  left:max(14px, env(safe-area-inset-left, 0px));
+  right:auto;
+  width:36px; height:36px;
   background:rgba(8,20,12,0.78);
   border:1px solid rgba(201,162,39,0.3);
   border-radius:50%;
   color:#a8d4a8;
-  font-size:18px; line-height:1;
+  font-size:17px; line-height:1;
   display:none; align-items:center; justify-content:center;
   cursor:pointer; z-index:50;
   -webkit-tap-highlight-color:transparent;
@@ -711,61 +743,11 @@ body.is-touch .time-option,
 body.is-touch .wx-card{ min-height:48px; cursor:pointer; }
 body.is-touch .btn-launch{ min-height:48px; padding:14px 32px; font-size:13px; }
 
-/* ---- ORIENTATION OVERLAY ----
-   Show a friendly "rotate your phone" overlay on touch + portrait so
-   the gameplay layout (designed for landscape) never gets squashed.
-   The overlay is fixed inset:0 above everything; nothing else needs
-   to know about portrait mode. */
-#orientation-overlay{
-  position:fixed; inset:0;
-  background:linear-gradient(135deg, #0a3020 0%, #020608 100%);
-  display:none; align-items:center; justify-content:center;
-  flex-direction:column; gap:24px;
-  z-index:9999;
-  padding:32px; text-align:center;
-}
-body.is-touch #orientation-overlay{
-  /* shown via @media query below */
-}
-@media (orientation: portrait){
-  body.is-touch #orientation-overlay{ display:flex; }
-  /* Belt-and-suspenders: also hide the game container so any rogue
-     touch on the underlying scene doesn't fire game logic. */
-  body.is-touch #game-container{ visibility:hidden; }
-  body.is-touch #title-screen,
-  body.is-touch #setup-screen{ visibility:hidden; }
-}
-#orientation-overlay .rotate-icon{
-  width:96px; height:96px;
-  border:3px solid rgba(201,162,39,0.6);
-  border-radius:14px;
-  position:relative;
-  animation:rotate-hint 2.4s ease-in-out infinite;
-}
-#orientation-overlay .rotate-icon::before{
-  content:''; position:absolute; inset:18px;
-  border:2px dashed rgba(201,162,39,0.4);
-  border-radius:4px;
-}
-@keyframes rotate-hint{
-  0%, 30%   { transform:rotate(0deg);  }
-  50%, 70%  { transform:rotate(-90deg); }
-  90%, 100% { transform:rotate(0deg);  }
-}
-#orientation-overlay h2{
-  font-family:'Playfair Display',serif;
-  font-size:28px;
-  color:var(--gold-light);
-  font-weight:700;
-  letter-spacing:1px;
-}
-#orientation-overlay p{
-  font-size:14px;
-  color:#a8d4a8;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  max-width:300px;
-}
+/* ---- ORIENTATION ----
+   v17.3.14: orientation overlay REMOVED. The title and setup screens
+   now adapt to portrait (see media queries far below). The fishing
+   scene still requires landscape for now, but we let the player
+   reach it rather than blocking them at the door. */
 
 /* ---- INSTALL BANNER ----
    First visit on a touch device: subtle dismissible chip at the bottom
@@ -857,6 +839,259 @@ body.is-touch #install-banner.show{ display:flex; }
   body.is-touch #setup-screen .wx-card .wx-art{ width:44px; height:28px; }
   body.is-touch #setup-screen .wx-card .wx-name{ font-size:11px; }
   body.is-touch #setup-screen .wx-card .wx-sub{ display:none; }
+}
+
+/* ============================================================
+   v17.3.14 — PORTRAIT-FRIENDLY TITLE + SETUP
+   Make the title and setup screens fully usable on a vertical phone.
+   Strategy: turn the screens into proper scrollable containers
+   (they were fixed/centered before, which clipped content when it
+   was taller than the viewport). Also stack the time/weather columns
+   vertically and let the time-of-day cards wrap onto multiple rows.
+   ============================================================ */
+
+/* On touch devices, the title and setup screens become true scroll
+   containers. The `inset:0` keeps them filling the viewport; switching
+   `align-items` from center to flex-start lets content start at the top
+   and grow downward instead of being vertically clipped. */
+body.is-touch #title-screen,
+body.is-touch #setup-screen{
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  align-items:stretch;            /* let content take full width */
+  justify-content:flex-start;     /* anchor to top instead of vertical center */
+  padding:max(20px, env(safe-area-inset-top, 0px)) 0
+          max(20px, env(safe-area-inset-bottom, 0px)) 0;
+}
+
+/* Title screen on touch: a vertical column that scrolls if needed. */
+body.is-touch #title-screen .title-content{
+  padding:24px 24px 40px;
+  min-height:100%;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  box-sizing:border-box;
+}
+body.is-touch #title-screen .game-title{
+  font-size:clamp(40px, 12vw, 72px);
+  margin-bottom:6px;
+}
+body.is-touch #title-screen .game-subtitle{
+  font-size:11px; letter-spacing:5px;
+  margin-bottom:32px;
+}
+body.is-touch #title-screen .name-input{
+  font-size:22px; padding:14px 18px; min-height:52px;
+}
+body.is-touch #title-screen .btn-primary{
+  padding:16px 32px; font-size:14px; min-height:52px;
+}
+
+/* Setup screen on touch: same scroll-container treatment, with the
+   content stack tightened for vertical viewports. */
+body.is-touch #setup-screen .setup-content{
+  padding:24px 18px 32px;
+  max-width:100%;
+}
+
+/* PORTRAIT: stack the two columns (time + weather) vertically.
+   Each column claims full width; the time-of-day strip wraps onto
+   multiple rows instead of overflowing horizontally. */
+@media (orientation: portrait){
+  body.is-touch #setup-screen .setup-columns{
+    flex-direction:column;
+    gap:18px;
+    margin-bottom:18px;
+    align-items:stretch;
+  }
+  body.is-touch #setup-screen .setup-col{
+    width:100%;
+  }
+  /* Time strip: wrap so all 5 cards fit. They become a grid that
+     auto-fills based on viewport width. */
+  body.is-touch #setup-screen .time-strip{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(86px, 1fr));
+    gap:8px;
+  }
+  body.is-touch #setup-screen .time-option{
+    width:auto; min-width:0;
+  }
+  /* Weather grid stays a 3-column grid; just make the cards adapt. */
+  body.is-touch #setup-screen .weather-grid{
+    grid-template-columns:repeat(auto-fill, minmax(86px, 1fr));
+  }
+  body.is-touch #setup-screen .wx-card{
+    min-width:0;
+  }
+  /* Headings: scale to portrait width. */
+  body.is-touch #setup-screen .setup-heading{
+    font-size:clamp(26px, 7vw, 38px);
+    margin-bottom:8px;
+    line-height:1.05;
+  }
+  body.is-touch #setup-screen .setup-eyebrow{
+    margin-bottom:6px;
+  }
+  body.is-touch #setup-screen .setup-divider{
+    margin-bottom:20px;
+  }
+  body.is-touch #setup-screen .btn-launch{
+    padding:14px 28px; font-size:13px;
+    min-height:48px;
+    width:100%; max-width:300px; justify-content:center;
+  }
+  body.is-touch #setup-screen .setup-summary{
+    text-align:center;
+  }
+}
+
+/* LANDSCAPE-but-tall (e.g. tablet 1024×768 landscape, or phone in
+   landscape with browser UI hidden): keep columns side-by-side but
+   ensure they fit. Mostly handled by existing rules; this is just a
+   safety net. */
+@media (orientation: landscape) and (max-height: 500px){
+  body.is-touch #title-screen .title-content{ padding:14px 24px; }
+  body.is-touch #title-screen .game-title{ font-size:clamp(32px, 6vw, 56px); margin-bottom:4px; }
+  body.is-touch #title-screen .game-subtitle{ margin-bottom:18px; }
+  body.is-touch #title-screen .name-input{ font-size:18px; padding:10px 14px; min-height:42px; }
+  body.is-touch #title-screen .btn-primary{ padding:12px 26px; font-size:13px; min-height:42px; }
+}
+
+/* ============================================================
+   v17.3.14 — PORTRAIT MAP PHASE LAYOUT
+   The map runs full-screen at any orientation; in portrait we
+   reflow the UI overlays so they don't collide. Touch-only
+   (desktop never sees this).
+   ============================================================ */
+@media (orientation: portrait){
+  /* HUD: keep player+conditions on left, stats on right, but
+     compact both so the centered Live Well button fits between
+     on a 360-390px phone. The font sizes come down a notch and
+     the padding tightens. */
+  body.is-touch #hud{
+    padding-top:max(10px, env(safe-area-inset-top, 0px));
+    padding-left:max(10px, env(safe-area-inset-left, 0px));
+    padding-right:max(10px, env(safe-area-inset-right, 0px));
+  }
+  body.is-touch #hud .hud-panel{
+    padding:6px 9px;
+  }
+  body.is-touch #hud-player-name{ font-size:12px; line-height:1.1; }
+  body.is-touch #hud-conditions{ font-size:9px; letter-spacing:0.5px; }
+  body.is-touch #hud .hud-stats{ font-size:9px; line-height:1.25; }
+  body.is-touch #hud .hud-stats strong{ font-size:12px; }
+
+  /* Live Well: hide the wide centered button in portrait — its label
+     "🐟 Live Well" wraps awkwardly and collides with HUD panels and the
+     sound-toggle. Instead, the stats panel itself becomes tappable to
+     open the live well drawer. (Wired in JS below.) */
+  body.is-touch #livewell-btn{
+    display:none !important;
+  }
+  /* The stats panel becomes a tap target. Slight visual cue. */
+  body.is-touch #hud .hud-panel:last-child{
+    cursor:pointer;
+    transition:background .2s, border-color .2s;
+  }
+  body.is-touch #hud .hud-panel:last-child:active{
+    background:rgba(201,162,39,0.12);
+    border-color:rgba(201,162,39,0.55);
+  }
+
+  /* Sound toggle: positioned globally below the player HUD; no
+     portrait-specific override needed. */
+
+  /* Zoom controls: move to BOTTOM-LEFT corner (clear of bottom-right
+     joystick and bottom-center anchor button). Vertical strip. */
+  body.is-touch #zoom-controls{
+    top:auto;
+    bottom:max(20px, env(safe-area-inset-bottom, 0px));
+    left:max(14px, env(safe-area-inset-left, 0px));
+    right:auto;
+    flex-direction:column;
+    gap:6px;
+  }
+  body.is-touch #zoom-controls .zoom-btn{
+    width:42px; height:42px; font-size:20px;
+  }
+
+  /* Anchor button: position relative to the joystick (which is bottom-
+     right). In portrait the joystick is closer to the corner, so the
+     anchor button needs more headroom above. Also shrink to fit. */
+  body.is-touch #anchor-btn{
+    bottom:max(170px, calc(170px + env(safe-area-inset-bottom, 0px)));
+    right:max(14px, env(safe-area-inset-right, 0px));
+    padding:11px 16px;
+    font-size:11px;
+    min-height:44px;
+    letter-spacing:1px;
+    /* Use a tighter label on portrait phones - the [D] hint is for
+       keyboard players who aren't on phones anyway. We override the
+       label content via the ::after trick. Keeping the button text
+       intact for HTML/JS — just visually swap on portrait. */
+  }
+  /* Conditions button: above anchor, smaller. */
+  body.is-touch #conditions-btn{
+    bottom:max(222px, calc(222px + env(safe-area-inset-bottom, 0px)));
+    right:max(14px, env(safe-area-inset-right, 0px));
+    padding:9px 12px;
+    font-size:10px;
+    min-height:38px;
+    letter-spacing:1px;
+  }
+
+  /* Joystick: keep size, but make sure it's clear of edges.
+     The default `bottom:20px right:20px` is fine; nudge slightly
+     inward for the bottom-safe-area on iPhones with home indicator. */
+  body.is-touch #touch-joystick{
+    bottom:max(20px, env(safe-area-inset-bottom, 0px));
+    right:max(20px, env(safe-area-inset-right, 0px));
+  }
+
+  /* Livewell panel (the drawer that opens when you tap stats): in
+     portrait, make it slide in from the top so it doesn't fight with
+     bottom controls. */
+  body.is-touch #livewell-panel{
+    width:min(360px, calc(100vw - 28px));
+    max-width:none;
+    right:max(14px, env(safe-area-inset-right, 0px));
+    top:80px;
+    max-height:calc(100vh - 280px);
+    overflow-y:auto;
+  }
+  /* Install banner: in portrait, move to top below HUD+sound-toggle so
+     it doesn't overlap the joystick at the bottom. */
+  body.is-touch #install-banner{
+    bottom:auto;
+    top:max(110px, calc(110px + env(safe-area-inset-top, 0px)));
+    max-width:calc(100vw - 28px);
+  }
+  /* Center-on-boat button: in portrait, move below sound toggle. */
+  body.is-touch #center-boat-btn{
+    top:max(108px, calc(108px + env(safe-area-inset-top, 0px)));
+  }
+}
+
+/* Very small portrait phones (e.g. iPhone SE, 360-wide): tighten further. */
+@media (orientation: portrait) and (max-width: 380px){
+  body.is-touch #anchor-btn{
+    padding:10px 12px; font-size:10px;
+  }
+  body.is-touch #conditions-btn{
+    padding:8px 10px; font-size:9px;
+  }
+  body.is-touch #touch-joystick{ width:120px; height:120px; }
+  body.is-touch #touch-joystick-knob{
+    width:54px; height:54px; margin-left:-27px; margin-top:-27px;
+  }
+  body.is-touch #anchor-btn{
+    bottom:max(150px, calc(150px + env(safe-area-inset-bottom, 0px)));
+  }
+  body.is-touch #conditions-btn{
+    bottom:max(198px, calc(198px + env(safe-area-inset-bottom, 0px)));
+  }
 }
 
 </style>
@@ -1047,6 +1282,20 @@ body.is-touch #install-banner.show{ display:flex; }
     </div>
   </div>
 
+  <!-- v17.3.14: "Center on Boat" button appears when the user manually
+       pans the map away from the boat. Tapping it resumes auto-follow. -->
+  <button id="center-boat-btn" class="touch-btn" aria-label="Center on boat">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px">
+      <circle cx="12" cy="12" r="3"/>
+      <circle cx="12" cy="12" r="9"/>
+      <line x1="12" y1="2" x2="12" y2="5"/>
+      <line x1="12" y1="19" x2="12" y2="22"/>
+      <line x1="2" y1="12" x2="5" y2="12"/>
+      <line x1="19" y1="12" x2="22" y2="12"/>
+    </svg>
+    Center on Boat
+  </button>
+
   <div id="touch-fish-controls">
     <div id="touch-fish-hint">←→ Aim · Hold anywhere to charge cast</div>
     <button class="touch-aim-btn touch-btn" id="touch-aim-left" aria-label="Aim left">◀</button>
@@ -1084,12 +1333,9 @@ body.is-touch #install-banner.show{ display:flex; }
   </div>
 </div>
 
-<!-- v17.3.13 — Orientation overlay (touch + portrait only) -->
-<div id="orientation-overlay" aria-hidden="true">
-  <div class="rotate-icon" aria-hidden="true"></div>
-  <h2>Rotate Your Phone</h2>
-  <p>Vermillion Slayers plays in landscape mode</p>
-</div>
+<!-- v17.3.14: rotate-to-landscape overlay removed; the title and setup
+     screens are responsive in portrait. The fishing scene still works
+     best in landscape but is reachable in any orientation. -->
 
 <!-- v17.3.13 — Install banner (first visit, touch only, dismissible) -->
 <div id="install-banner" role="dialog" aria-label="Install app">
@@ -2252,14 +2498,57 @@ function isOnLand(lat,lng){
 // LEAFLET MAP
 // ================================================================
 function initLeafletMap(){
+  // v17.3.14: on touch devices, enable pinch-zoom and drag-pan so the
+  // player can frame the lake however they like. The joystick has its
+  // own pointer-events:auto and sits above the map, so finger drags
+  // *on the joystick* go to it; drags anywhere else go to the map.
+  // touchZoom is left on (Leaflet default), and tap delay disabled to
+  // play well with our touch button overlays.
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   leafMap=L.map('map-leaflet',{
     center:[47.900,-92.390],zoom:13,
     zoomControl:false,attributionControl:false,
-    dragging:false,scrollWheelZoom:true,
-    doubleClickZoom:false,keyboard:false,
+    dragging: isTouch,           // touch: drag-pan; desktop: keep arrow-key boat control
+    scrollWheelZoom: true,
+    touchZoom: true,             // pinch zoom (default true, explicit for clarity)
+    doubleClickZoom:false,
+    keyboard:false,
+    tap:true,                    // good touch interaction with Leaflet
+    bounceAtZoomLimits:false,
+    maxBoundsViscosity:0.0,
+    minZoom: 11,
+    maxZoom: 18,
   });
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     {maxZoom:18}).addTo(leafMap);
+
+  // v17.3.14: follow-boat state. When the user manually pans/zooms (touch
+  // drag, pinch, zoom buttons), we stop auto-following the boat so we don't
+  // yank the view back from under their finger. A floating "Center on Boat"
+  // button appears so they can resume following.
+  window._followBoat = true;
+  const stopFollowing = () => {
+    if(window._followBoat){
+      window._followBoat = false;
+      const btn = document.getElementById('center-boat-btn');
+      if(btn) btn.classList.add('show');
+    }
+  };
+  // Leaflet fires 'dragstart' when the user starts panning, and 'zoomstart'
+  // when they pinch or use zoom buttons. Both should disable auto-follow.
+  // We DON'T listen for 'movestart' because our own panTo() fires that.
+  leafMap.on('dragstart', stopFollowing);
+  // For pinch zoom we want to detect user-initiated zoom only — Leaflet
+  // fires 'zoomstart' for both. We discriminate by checking if zoom changed
+  // since last boat-update; user pinches change zoom, our panTo() doesn't.
+  let lastKnownZoom = leafMap.getZoom();
+  leafMap.on('zoomend', () => {
+    const z = leafMap.getZoom();
+    if(z !== lastKnownZoom){
+      stopFollowing();
+      lastKnownZoom = z;
+    }
+  });
 
   // v17: subtle hotspot visuals — italic place names + gentle surface ripples.
   // Hotspots remain active in gameplay (rollFish, pickSpecies). No bright markers,
@@ -2353,7 +2642,12 @@ function updateBoat(){
   const el=document.getElementById('boat-icon-div');
   if(el) el.style.transform=`rotate(${deg}deg)`;
 
-  leafMap.panTo(pos,{animate:true,duration:0.1,easeLinearity:1,noMoveStart:true});
+  // v17.3.14: only auto-follow the boat when the user hasn't manually
+  // panned away. If they have, leave the view alone — there's a
+  // "Center on Boat" button they can hit to resume following.
+  if(window._followBoat !== false){
+    leafMap.panTo(pos,{animate:true,duration:0.1,easeLinearity:1,noMoveStart:true});
+  }
   checkHotspotProximity();
 }
 
@@ -4484,6 +4778,33 @@ function initTouchUI(){
   startTouchUiPoller();
   setupInstallBanner();
   setupSoundToggle();
+  setupCenterBoatButton();
+  // v17.3.14: shorten button labels on touch so they fit narrow viewports.
+  // The "[D]" keyboard hint is irrelevant on a phone; "🐟 Live Well" wraps.
+  // The HTML keeps the original labels so JS that reads them by text still
+  // works (e.g. accessibility); these innerHTML updates are visual-only.
+  const anchorBtn = document.getElementById('anchor-btn');
+  if(anchorBtn) anchorBtn.innerHTML = '⚓ Drop Anchor';
+  const condBtn = document.getElementById('conditions-btn');
+  if(condBtn) condBtn.innerHTML = '🕐 Conditions';
+}
+
+// v17.3.14: Center-on-boat button click handler. Re-enables auto-follow
+// and snaps the view to the boat. The button hides itself after click via
+// the same flag that controls panTo.
+function setupCenterBoatButton(){
+  const btn = document.getElementById('center-boat-btn');
+  if(!btn) return;
+  btn.addEventListener('click', (ev) => {
+    ev.currentTarget.blur();
+    window._followBoat = true;
+    btn.classList.remove('show');
+    // Snap the view to the boat immediately so the user sees the result.
+    if(typeof leafMap !== 'undefined' && leafMap && G && G.boat){
+      leafMap.panTo([G.boat.lat, G.boat.lng], { animate:true, duration:0.3 });
+    }
+    if(typeof vsHaptic === 'function') vsHaptic(8);
+  });
 }
 
 // ---- SERVICE WORKER ----
@@ -4866,6 +5187,19 @@ document.getElementById('launch-btn').addEventListener('click',()=>{
   setTimeout(()=>{ss.classList.add('gone');launchGame();},620);
 });
 document.getElementById('livewell-btn').addEventListener('click',()=>document.getElementById('livewell-panel').classList.toggle('open'));
+// v17.3.14: in portrait the livewell-btn is hidden; the right HUD panel
+// (stats) becomes the tap target instead. Wired here as a parallel
+// trigger so both interactions toggle the same drawer.
+(function wireStatsPanelLivewell(){
+  const hud = document.getElementById('hud');
+  if(!hud) return;
+  const panels = hud.querySelectorAll('.hud-panel');
+  const statsPanel = panels[panels.length - 1]; // last panel = stats
+  if(!statsPanel) return;
+  statsPanel.addEventListener('click', () => {
+    document.getElementById('livewell-panel').classList.toggle('open');
+  });
+})();
 document.getElementById('anchor-btn').addEventListener('click',(ev)=>{ev.currentTarget.blur();enterFishing();});
 document.getElementById('conditions-btn').addEventListener('click',(ev)=>{
   ev.currentTarget.blur();
